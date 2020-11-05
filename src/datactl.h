@@ -1,4 +1,4 @@
-/*
+﻿/*
 * @file 	datactrl.h
 * @date 	2018/03/25 22:13
 *
@@ -25,7 +25,7 @@
 #include <thread>
 
 #include <inttypes.h>
-#include <math.h>
+#include <cmath>
 #include <limits.h>
 #include <signal.h>
 #include <stdint.h>
