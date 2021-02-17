@@ -142,7 +142,8 @@ void Show::keyReleaseEvent(QKeyEvent *event)
     switch (event->key())
     {
     case Qt::Key_Return://全屏
-        SigFullScreen();
+    case Qt::Key_Enter:
+        emit SigFullScreen();
         break;
     case Qt::Key_Left://后退5s
         emit SigSeekBack();
@@ -157,7 +158,7 @@ void Show::keyReleaseEvent(QKeyEvent *event)
     case Qt::Key_Down://减少10音量
         emit SigSubVolume();
         break;
-    case Qt::Key_Space://减少10音量
+    case Qt::Key_Space:
         emit SigPlayOrPause();
         break;
 

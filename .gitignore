@@ -268,3 +268,8 @@ playerdemo/Makefile
 playerdemo/GeneratedFiles/ui_title.h
 playerdemo/GeneratedFiles/ui_mainwid.h
 /playerdemo/GeneratedFiles
+/SDL2-2.0.12-win32-x64.zip
+/.qmake.stash
+/playerdemo.sln
+/playerdemo.vcxproj
+/playerdemo.vcxproj.filters
