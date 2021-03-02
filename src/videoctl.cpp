@@ -1268,7 +1268,7 @@ int VideoCtl::is_realtime(AVFormatContext *s)
 void VideoCtl::ReadThread(VideoState *is)
 {
     //VideoState *is = (VideoState *)arg;
-    AVFormatContext *ic = NULL;
+    AVFormatContext *ic = NULL; //文件格式信息
     int err, i, ret;
     int st_index[AVMEDIA_TYPE_NB];
     AVPacket pkt1, *pkt = &pkt1;
@@ -1304,7 +1304,7 @@ void VideoCtl::ReadThread(VideoState *is)
     ic->interrupt_callback.callback = decode_interrupt_cb;
     ic->interrupt_callback.opaque = is;
 
-    //打开文件，获得封装等信息
+    // A1. 打开文件，读取文件头，获得封装等格式信息
     err = avformat_open_input(&ic, is->filename, is->iformat, nullptr/*&format_opts*/);
     if (err < 0) {
         //print_error(is->filename, err);
@@ -1319,7 +1319,8 @@ void VideoCtl::ReadThread(VideoState *is)
 
     opts = nullptr;// setup_find_stream_info_opts(ic, codec_opts);
     orig_nb_streams = ic->nb_streams;
-    //读取一部分视音频数据并且获得一些相关的信息
+    // A2. 搜索流信息：读取一部分视音频数据，尝试解码，
+    // 并且获得一些相关的信息存入ic->streams中
     err = avformat_find_stream_info(ic, opts);
 
 //     for (i = 0; i < orig_nb_streams; i++)
@@ -1343,7 +1344,7 @@ void VideoCtl::ReadThread(VideoState *is)
 
     emit SigVideoTotalSeconds(ic->duration / 1000000LL);
 
-
+    // wanted_stream_spec没有改变过值，下面的两个for循环语句都不会有效执行
     for (i = 0; i < ic->nb_streams; i++) {
         AVStream *st = ic->streams[i];
         enum AVMediaType type = st->codecpar->codec_type;
@@ -1359,8 +1360,7 @@ void VideoCtl::ReadThread(VideoState *is)
         }
     }
 
-    //获得视频、音频、字幕的流索引
-
+    // A3. 获得视频、音频、字幕的流索引
     st_index[AVMEDIA_TYPE_VIDEO] =
         av_find_best_stream(ic, AVMEDIA_TYPE_VIDEO,
             st_index[AVMEDIA_TYPE_VIDEO], -1, NULL, 0);
@@ -1379,25 +1379,26 @@ void VideoCtl::ReadThread(VideoState *is)
                 st_index[AVMEDIA_TYPE_VIDEO]),
             NULL, 0);
 
+    // 获得局部变量有什么用……
     if (st_index[AVMEDIA_TYPE_VIDEO] >= 0) {
         AVStream *st = ic->streams[st_index[AVMEDIA_TYPE_VIDEO]];
         AVCodecParameters *codecpar = st->codecpar;
         AVRational sar = av_guess_sample_aspect_ratio(ic, st, NULL);
     }
 
-    /* open the streams */
-    //打开音频流
+    // A4. open the streams 
+    // A4.1 打开音频流
     if (st_index[AVMEDIA_TYPE_AUDIO] >= 0) {
         stream_component_open(is, st_index[AVMEDIA_TYPE_AUDIO]);
     }
 
-    //打开视频流
+    // A4.2 打开视频流
     ret = -1;
     if (st_index[AVMEDIA_TYPE_VIDEO] >= 0) {
         ret = stream_component_open(is, st_index[AVMEDIA_TYPE_VIDEO]);
     }
 
-    //打开字幕流
+    // A4.3 打开字幕流
     if (st_index[AVMEDIA_TYPE_SUBTITLE] >= 0) {
         stream_component_open(is, st_index[AVMEDIA_TYPE_SUBTITLE]);
     }
