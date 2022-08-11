@@ -714,7 +714,7 @@ int VideoCtl::video_thread(void *arg)
 {
     VideoState *is = (VideoState *)arg;
     AVFrame *frame = av_frame_alloc();
-    double pts;
+    double pts; // presentation timestamp
     double duration;
     int ret;
     AVRational tb = is->video_st->time_base;
@@ -733,10 +733,10 @@ int VideoCtl::video_thread(void *arg)
         if (!ret)
             continue;
 
-            duration = (frame_rate.num && frame_rate.den ? av_q2d(/*(AVRational) */{ frame_rate.den, frame_rate.num }) : 0);
-            pts = (frame->pts == AV_NOPTS_VALUE) ? NAN : frame->pts * av_q2d(tb);
-            ret = queue_picture(is, frame, pts, duration, av_frame_get_pkt_pos(frame), is->viddec.pkt_serial);
-            av_frame_unref(frame);
+        duration = (frame_rate.num && frame_rate.den ? av_q2d(/*(AVRational) */{ frame_rate.den, frame_rate.num }) : 0);
+        pts = (frame->pts == AV_NOPTS_VALUE) ? NAN : frame->pts * av_q2d(tb);
+        ret = queue_picture(is, frame, pts, duration, av_frame_get_pkt_pos(frame), is->viddec.pkt_serial);
+        av_frame_unref(frame);
 
         if (ret < 0)
             goto the_end;
@@ -1113,25 +1113,50 @@ int VideoCtl::stream_component_open(VideoState *is, int stream_index)
     if (stream_index < 0 || stream_index >= ic->nb_streams)
         return -1;
 
-    //初始化结构体
+#if 1
+    // 1 配置AVCodecContext结构体avctx
+    // 1.1 分配一个AVCodecContext结构体avctx，未初始化内部默认值
     avctx = avcodec_alloc_context3(NULL);
     if (!avctx)
         return AVERROR(ENOMEM);
 
+    // 1.2 根据相应stream中的AVCodecParameters填充avctx结构体默认值
+    // Q：ic->streams在哪里设置的？
     ret = avcodec_parameters_to_context(avctx, ic->streams[stream_index]->codecpar);
     if (ret < 0)
         goto fail;
     av_codec_set_pkt_timebase(avctx, ic->streams[stream_index]->time_base);
-    //寻找解码器
+    
+    // 1.3 根据解码器ID寻找解码器
     codec = avcodec_find_decoder(avctx->codec_id);
-
-    switch (avctx->codec_type) {
-    case AVMEDIA_TYPE_AUDIO: is->last_audio_stream = stream_index; break;
-    case AVMEDIA_TYPE_SUBTITLE: is->last_subtitle_stream = stream_index; break;
-    case AVMEDIA_TYPE_VIDEO: is->last_video_stream = stream_index; break;
+    
+#else
+    // 博客（https://www.cnblogs.com/leisure_chn/p/10040202.html）中初始化avctx的方法
+    codec = avcodec_find_decoder(ic->streams[stream_index]->codecpar->codec_id);
+    if (!codec)
+    {
+        goto fail;
     }
 
-    avctx->codec_id = codec->id;
+    avctx = avcodec_alloc_context3(codec);
+
+    ret = avcodec_parameters_to_context(avctx, ic->streams[stream_index]->codecpar);
+	if (ret < 0)
+		goto fail;
+    av_codec_set_pkt_timebase(avctx, ic->streams[stream_index]->time_base);
+#endif
+
+    // last_xx_stream在stream_cycle_channel()中被访问
+	switch (avctx->codec_type) {
+	case AVMEDIA_TYPE_AUDIO: is->last_audio_stream = stream_index; break;
+	case AVMEDIA_TYPE_SUBTITLE: is->last_subtitle_stream = stream_index; break;
+	case AVMEDIA_TYPE_VIDEO: is->last_video_stream = stream_index; break;
+	}
+
+    // codex是通过avctx->codec_id找到的，这一句是不是多余了？？
+    // 注释掉这一句也可以正常播放
+    // avctx->codec_id = codec->id;
+
     if (stream_lowres > av_codec_get_max_lowres(codec)) {
         av_log(avctx, AV_LOG_WARNING, "The maximum value for lowres supported by the decoder is %d\n",
             av_codec_get_max_lowres(codec));
@@ -1155,7 +1180,8 @@ int VideoCtl::stream_component_open(VideoState *is, int stream_index)
         av_dict_set_int(&opts, "lowres", stream_lowres, 0);
     if (avctx->codec_type == AVMEDIA_TYPE_VIDEO || avctx->codec_type == AVMEDIA_TYPE_AUDIO)
         av_dict_set(&opts, "refcounted_frames", "1", 0);
-    //打开解码器
+
+    // 1.4 用找到的解码器codec初始化avctx
     if ((ret = avcodec_open2(avctx, codec, &opts)) < 0) {
         goto fail;
     }
@@ -1165,6 +1191,7 @@ int VideoCtl::stream_component_open(VideoState *is, int stream_index)
         goto fail;
     }
 
+    // 2 打开对应的流
     is->eof = 0;
     ic->streams[stream_index]->discard = AVDISCARD_DEFAULT;
     switch (avctx->codec_type) {
