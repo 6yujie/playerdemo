@@ -1586,7 +1586,7 @@ fail:
 VideoState* VideoCtl::stream_open(const char *filename)
 {
     VideoState *is;
-    //构造视频状态类
+    //构造视频状态类，分配内存，初始化内容
     is = (VideoState *)av_mallocz(sizeof(VideoState));
     if (!is)
         return NULL;

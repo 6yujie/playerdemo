@@ -199,9 +199,9 @@ typedef struct VideoState {
     Clock vidclk;
     Clock extclk;
 
-    FrameQueue pictq;
-    FrameQueue subpq;
-    FrameQueue sampq;
+    FrameQueue pictq; // 视频帧队列
+    FrameQueue subpq; // 字幕帧队列
+    FrameQueue sampq; // 音频帧队列
 
     Decoder auddec;
     Decoder viddec;
@@ -218,7 +218,7 @@ typedef struct VideoState {
     double audio_diff_threshold;
     int audio_diff_avg_count;
     AVStream *audio_st;
-    PacketQueue audioq;
+    PacketQueue audioq; // 音频数据包队列
     int audio_hw_buf_size;
     uint8_t *audio_buf;
     uint8_t *audio_buf1;
@@ -249,14 +249,14 @@ typedef struct VideoState {
 
     int subtitle_stream;
     AVStream *subtitle_st;
-    PacketQueue subtitleq;
+    PacketQueue subtitleq; // 字幕数据包队列
 
     double frame_timer;
     double frame_last_returned_time;
     double frame_last_filter_delay;
     int video_stream;
     AVStream *video_st;
-    PacketQueue videoq;
+    PacketQueue videoq; // 视频数据包队列
     double max_frame_duration;      // maximum duration of a frame - above this, we consider the jump a timestamp discontinuity
     struct SwsContext *img_convert_ctx;
     struct SwsContext *sub_convert_ctx;
@@ -388,7 +388,7 @@ static void packet_queue_abort(PacketQueue *q)
 
     SDL_UnlockMutex(q->mutex);
 }
-//数据包队列开始使用
+//数据包（编码压缩数据）队列开始使用
 static void packet_queue_start(PacketQueue *q)
 {
     //初始化清理包
