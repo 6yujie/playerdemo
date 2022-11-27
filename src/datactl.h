@@ -83,15 +83,15 @@
 typedef struct MyAVPacketList {
     AVPacket pkt;
     struct MyAVPacketList *next;
-    int serial;
+    int serial;  // 序列号，用来判断播放是否连续
 } MyAVPacketList;
 
 //数据包队列
 typedef struct PacketQueue {
-    MyAVPacketList *first_pkt, *last_pkt;
+    MyAVPacketList *first_pkt, *last_pkt; // 队首和队尾
     int nb_packets;
-    int size;
-    int64_t duration;
+    int size;	// 队列所有节点字节总数，用于计算cache大小
+    int64_t duration;  // 队列所有节点的合计时长
     int abort_request;
     int serial; // 播放是否连续的标志
     SDL_mutex *mutex;
@@ -291,6 +291,7 @@ static int packet_queue_put_private(PacketQueue *q, AVPacket *pkt)
         return -1;
     pkt1->pkt = *pkt;
     pkt1->next = NULL;
+	// 如果放入的是flush_pkt，需要增加队列的序列号，以区分不连续的两段数据
     if (pkt == &flush_pkt)
         q->serial++;
     pkt1->serial = q->serial;
@@ -304,6 +305,7 @@ static int packet_queue_put_private(PacketQueue *q, AVPacket *pkt)
     q->size += pkt1->pkt.size + sizeof(*pkt1);
     q->duration += pkt1->pkt.duration;
     /* XXX: should duplicate packet data in DV case */
+	// 发信号表明当前队列有数据了，通知读线程可以读数据
     SDL_CondSignal(q->cond);
     return 0;
 }
@@ -323,7 +325,7 @@ static int packet_queue_put(PacketQueue *q, AVPacket *pkt)
     return ret;
 }
 
-//数据包队列存放空数据包
+//数据包队列存放空数据包，一般读取完成的时候放入空包
 static int packet_queue_put_nullpacket(PacketQueue *q, int stream_index)
 {
     AVPacket pkt1, *pkt = &pkt1;
@@ -352,7 +354,7 @@ static int packet_queue_init(PacketQueue *q)
     q->abort_request = 1;
     return 0;
 }
-//数据包队列清空
+//数据包队列清空。例如销毁队列、seek操作等
 static void packet_queue_flush(PacketQueue *q)
 {
     MyAVPacketList *pkt, *pkt1;
@@ -388,7 +390,7 @@ static void packet_queue_abort(PacketQueue *q)
 
     SDL_UnlockMutex(q->mutex);
 }
-//数据包（编码压缩数据）队列初始化与启动
+//数据包（编码压缩数据）队列初始化与启用
 static void packet_queue_start(PacketQueue *q)
 {
     //初始化清理包
