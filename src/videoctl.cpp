@@ -1440,7 +1440,7 @@ void VideoCtl::ReadThread(VideoState *is)
     if (infinite_buffer < 0 && is->realtime)
         infinite_buffer = 1;
 
-    //读取视频数据
+    //读取视频、音频和字幕数据
     for (;;) {
         if (is->abort_request)
             break;
@@ -1452,7 +1452,7 @@ void VideoCtl::ReadThread(VideoState *is)
                 av_read_play(ic);
         }
 
-        // 选取特定位置的数据（待确认）
+        // 选取特定位置的数据（seek）
         if (is->seek_req) {
             int64_t seek_target = is->seek_pos;
             int64_t seek_min = is->seek_rel > 0 ? seek_target - is->seek_rel + 2 : INT64_MIN;
@@ -1466,6 +1466,7 @@ void VideoCtl::ReadThread(VideoState *is)
                 av_log(NULL, AV_LOG_ERROR,
                     "%s: error while seeking\n", is->ic->filename);
             }
+			// 发生seek时，向队列中加入flush_pkt来进行区隔
             else 
             {
                 if (is->audio_stream >= 0) {
@@ -1529,10 +1530,14 @@ void VideoCtl::ReadThread(VideoState *is)
             continue;
         }
 
-        //按帧读取
+        // 读取下一帧
+		// 视频每次读取一帧
+		// 帧尺寸固定的音频每次读取到整数帧，不定长帧尺寸的音频每次读取一帧
         ret = av_read_frame(ic, pkt);
-        if (ret < 0) {
-            if ((ret == AVERROR_EOF || avio_feof(ic->pb)) && !is->eof) {
+        if (ret < 0) // 出错或文件结束
+		{
+            if ((ret == AVERROR_EOF || avio_feof(ic->pb)) && !is->eof) 
+			{
                 if (is->video_stream >= 0)
                     packet_queue_put_nullpacket(&is->videoq, is->video_stream);
                 if (is->audio_stream >= 0)
@@ -1548,7 +1553,8 @@ void VideoCtl::ReadThread(VideoState *is)
             SDL_UnlockMutex(wait_mutex);
             continue;
         }
-        else {
+        else 
+		{
             is->eof = 0;
         }
         /* check if packet is in play range specified by user, then queue, otherwise discard */
@@ -1560,17 +1566,22 @@ void VideoCtl::ReadThread(VideoState *is)
             (double)(0) / 1000000
             <= ((double)AV_NOPTS_VALUE / 1000000);
         //按数据帧的类型存放至对应队列
-        if (pkt->stream_index == is->audio_stream && pkt_in_play_range) {
+        if (pkt->stream_index == is->audio_stream && pkt_in_play_range) 
+		{
             packet_queue_put(&is->audioq, pkt);
         }
         else if (pkt->stream_index == is->video_stream && pkt_in_play_range
-            && !(is->video_st->disposition & AV_DISPOSITION_ATTACHED_PIC)) {
+            && !(is->video_st->disposition & AV_DISPOSITION_ATTACHED_PIC)) 
+		{
             packet_queue_put(&is->videoq, pkt);
         }
-        else if (pkt->stream_index == is->subtitle_stream && pkt_in_play_range) {
+        else if (pkt->stream_index == is->subtitle_stream && pkt_in_play_range) 
+		{
             packet_queue_put(&is->subtitleq, pkt);
         }
-        else {
+        else // 类型不属于音频、视频和字幕则清理
+		{
+			// 释放资源
             av_packet_unref(pkt);
         }
     }

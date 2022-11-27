@@ -187,7 +187,7 @@ typedef struct VideoState {
     int paused;
     int last_paused;
     int queue_attachments_req;
-    int seek_req;
+    int seek_req; // 跳转请求
     int seek_flags;
     int64_t seek_pos;
     int64_t seek_rel;
@@ -254,13 +254,13 @@ typedef struct VideoState {
     double frame_timer;
     double frame_last_returned_time;
     double frame_last_filter_delay;
-    int video_stream;
+    int video_stream; //视频流的编号？
     AVStream *video_st;
     PacketQueue videoq; // 视频数据包队列
     double max_frame_duration;      // maximum duration of a frame - above this, we consider the jump a timestamp discontinuity
     struct SwsContext *img_convert_ctx;
     struct SwsContext *sub_convert_ctx;
-    int eof;
+    int eof; // 文件结束标志，1为文件结束
 
     char *filename;
     int width, height, xleft, ytop;
