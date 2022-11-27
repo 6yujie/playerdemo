@@ -249,7 +249,8 @@ void MainWid::keyReleaseEvent(QKeyEvent *event)
 	switch (event->key())
 	{
 	case Qt::Key_Return://全屏
-        OnFullScreenPlay();
+    case Qt::Key_Enter:
+        emit OnFullScreenPlay();
 		break;
     case Qt::Key_Left://后退5s
         emit SigSeekBack();

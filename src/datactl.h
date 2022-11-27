@@ -25,7 +25,7 @@
 #include <thread>
 
 #include <inttypes.h>
-#include <math.h>
+#include <cmath>
 #include <limits.h>
 #include <signal.h>
 #include <stdint.h>
