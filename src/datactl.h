@@ -93,7 +93,7 @@ typedef struct PacketQueue {
     int size;
     int64_t duration;
     int abort_request;
-    int serial;
+    int serial; // 播放是否连续的标志
     SDL_mutex *mutex;
     SDL_cond *cond;
 } PacketQueue;
@@ -167,7 +167,7 @@ typedef struct Decoder {
     AVPacket pkt_temp;
     PacketQueue *queue;
     AVCodecContext *avctx;
-    int pkt_serial;
+    int pkt_serial;  // 播放是否连续的标志
     int finished;
     int packet_pending;
     SDL_cond *empty_queue_cond;
@@ -213,7 +213,7 @@ typedef struct VideoState {
 
     double audio_clock;
     int audio_clock_serial;
-    double audio_diff_cum; /* used for AV difference average computation */
+    double audio_diff_comp; /* used for AV difference average computation */
     double audio_diff_avg_coef;
     double audio_diff_threshold;
     int audio_diff_avg_count;
@@ -388,7 +388,7 @@ static void packet_queue_abort(PacketQueue *q)
 
     SDL_UnlockMutex(q->mutex);
 }
-//数据包（编码压缩数据）队列开始使用
+//数据包（编码压缩数据）队列初始化与启动
 static void packet_queue_start(PacketQueue *q)
 {
     //初始化清理包
@@ -470,9 +470,11 @@ static int decoder_decode_frame(Decoder *d, AVFrame *frame, AVSubtitle *sub) {
         if (d->queue->abort_request)
             return -1;
 
-        if (!d->packet_pending || d->queue->serial != d->pkt_serial) {
+        if (!d->packet_pending || d->queue->serial != d->pkt_serial) 
+        {
             AVPacket pkt;
-            do {
+            do 
+            {
                 if (d->queue->nb_packets == 0)
                     SDL_CondSignal(d->empty_queue_cond);
                 //从对应的队列中获取原始数据
@@ -490,7 +492,8 @@ static int decoder_decode_frame(Decoder *d, AVFrame *frame, AVSubtitle *sub) {
             d->packet_pending = 1;
         }
 
-        switch (d->avctx->codec_type) {
+        switch (d->avctx->codec_type) 
+        {
         case AVMEDIA_TYPE_VIDEO:
             //解码视频帧
             ret = avcodec_decode_video2(d->avctx, frame, &got_frame, &d->pkt_temp);

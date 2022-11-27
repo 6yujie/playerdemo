@@ -815,14 +815,14 @@ int VideoCtl::synchronize_audio(VideoState *is, int nb_samples)
         diff = get_clock(&is->audclk) - get_master_clock(is);
 
         if (!std::isnan(diff) && fabs(diff) < AV_NOSYNC_THRESHOLD) {
-            is->audio_diff_cum = diff + is->audio_diff_avg_coef * is->audio_diff_cum;
+            is->audio_diff_comp = diff + is->audio_diff_avg_coef * is->audio_diff_comp;
             if (is->audio_diff_avg_count < AUDIO_DIFF_AVG_NB) {
                 /* not enough measures to have a correct estimate */
                 is->audio_diff_avg_count++;
             }
             else {
                 /* estimate the A-V difference */
-                avg_diff = is->audio_diff_cum * (1.0 - is->audio_diff_avg_coef);
+                avg_diff = is->audio_diff_comp * (1.0 - is->audio_diff_avg_coef);
 
                 if (fabs(avg_diff) >= is->audio_diff_threshold) {
                     wanted_nb_samples = nb_samples + (int)(diff * is->audio_src.freq);
@@ -839,7 +839,7 @@ int VideoCtl::synchronize_audio(VideoState *is, int nb_samples)
             /* too big difference : may be initial PTS errors, so
             reset A-V filter */
             is->audio_diff_avg_count = 0;
-            is->audio_diff_cum = 0;
+            is->audio_diff_comp = 0;
         }
     }
 
@@ -1452,6 +1452,7 @@ void VideoCtl::ReadThread(VideoState *is)
                 av_read_play(ic);
         }
 
+        // 选取特定位置的数据（待确认）
         if (is->seek_req) {
             int64_t seek_target = is->seek_pos;
             int64_t seek_min = is->seek_rel > 0 ? seek_target - is->seek_rel + 2 : INT64_MIN;
@@ -1460,11 +1461,13 @@ void VideoCtl::ReadThread(VideoState *is)
             //      of the seek_pos/seek_rel variables
 
             ret = avformat_seek_file(is->ic, -1, seek_min, seek_target, seek_max, is->seek_flags);
-            if (ret < 0) {
+            if (ret < 0) 
+            {
                 av_log(NULL, AV_LOG_ERROR,
                     "%s: error while seeking\n", is->ic->filename);
             }
-            else {
+            else 
+            {
                 if (is->audio_stream >= 0) {
                     packet_queue_flush(&is->audioq);
                     packet_queue_put(&is->audioq, &flush_pkt);
@@ -1477,10 +1480,12 @@ void VideoCtl::ReadThread(VideoState *is)
                     packet_queue_flush(&is->videoq);
                     packet_queue_put(&is->videoq, &flush_pkt);
                 }
-                if (is->seek_flags & AVSEEK_FLAG_BYTE) {
+                if (is->seek_flags & AVSEEK_FLAG_BYTE) 
+                {
                     set_clock(&is->extclk, NAN, 0);
                 }
-                else {
+                else 
+                {
                     set_clock(&is->extclk, seek_target / (double)AV_TIME_BASE, 0);
                 }
             }
@@ -1490,6 +1495,7 @@ void VideoCtl::ReadThread(VideoState *is)
             if (is->paused)
                 step_to_next_frame(is);
         }
+
         if (is->queue_attachments_req) {
             if (is->video_st && is->video_st->disposition & AV_DISPOSITION_ATTACHED_PIC) {
                 AVPacket copy;
@@ -1513,6 +1519,7 @@ void VideoCtl::ReadThread(VideoState *is)
             SDL_UnlockMutex(wait_mutex);
             continue;
         }
+
         if (!is->paused &&
             (!is->audio_st || (is->auddec.finished == is->audioq.serial && frame_queue_nb_remaining(&is->sampq) == 0)) &&
             (!is->video_st || (is->viddec.finished == is->videoq.serial && frame_queue_nb_remaining(&is->pictq) == 0))) {
@@ -1521,6 +1528,7 @@ void VideoCtl::ReadThread(VideoState *is)
             emit SigStop();
             continue;
         }
+
         //按帧读取
         ret = av_read_frame(ic, pkt);
         if (ret < 0) {
