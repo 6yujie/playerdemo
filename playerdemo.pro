@@ -8,6 +8,7 @@ DESTDIR = bin
 QT += core gui widgets
 #CONFIG += debug
 #DEFINES += _UNICODE WIN64 QT_WIDGETS_LIB
+#DEFINES += _UNICODE WIN64 QT_WIDGETS_LIB
 
 win32 {
 LIBS += -L$$PWD/lib/sdl/lib \

@@ -63,7 +63,7 @@ public:
 #define UINT64_C
 #endif
 
-extern "C"{
+extern "C" {
 #include "libavutil/avstring.h"
 #include "libavutil/eval.h"
 #include "libavutil/mathematics.h"
