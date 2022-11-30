@@ -1121,13 +1121,13 @@ int VideoCtl::stream_component_open(VideoState *is, int stream_index)
         return AVERROR(ENOMEM);
 
     // 1.2 根据相应stream中的AVCodecParameters填充avctx结构体默认值
-    // Q：ic->streams在哪里设置的？
+    // ic->streams在VideoCtl::ReadThread步骤A2设置
     ret = avcodec_parameters_to_context(avctx, ic->streams[stream_index]->codecpar);
     if (ret < 0)
         goto fail;
     av_codec_set_pkt_timebase(avctx, ic->streams[stream_index]->time_base);
     
-    // 1.3 根据解码器ID寻找解码器
+    // 1.3 根据解码器ID寻找解码器。codec_id前面已经在步骤1.2从ic->streams[stream_index]设置了
     codec = avcodec_find_decoder(avctx->codec_id);
     
 #else
@@ -1329,7 +1329,7 @@ void VideoCtl::ReadThread(VideoState *is)
         goto fail;
     }
     ic->interrupt_callback.callback = decode_interrupt_cb;
-    ic->interrupt_callback.opaque = is;
+    ic->interrupt_callback.opaque = is;	//callback的参数
 
     // A1. 打开文件，读取文件头，获得封装等格式信息
     err = avformat_open_input(&ic, is->filename, is->iformat, nullptr/*&format_opts*/);
@@ -1341,11 +1341,12 @@ void VideoCtl::ReadThread(VideoState *is)
 
     is->ic = ic;
 
-
+	// side data指附加信息，如视频旋转信息等
     av_format_inject_global_side_data(ic);
 
     opts = nullptr;// setup_find_stream_info_opts(ic, codec_opts);
     orig_nb_streams = ic->nb_streams;
+
     // A2. 搜索流信息：读取一部分视音频数据，尝试解码，
     // 并且获得一些相关的信息存入ic->streams中
     err = avformat_find_stream_info(ic, opts);
@@ -1372,7 +1373,8 @@ void VideoCtl::ReadThread(VideoState *is)
     emit SigVideoTotalSeconds(ic->duration / 1000000LL);
 
     // wanted_stream_spec没有改变过值，下面的两个for循环语句都不会有效执行
-    for (i = 0; i < ic->nb_streams; i++) {
+    for (i = 0; i < ic->nb_streams; i++) 
+	{
         AVStream *st = ic->streams[i];
         enum AVMediaType type = st->codecpar->codec_type;
         st->discard = AVDISCARD_ALL;
@@ -1392,12 +1394,15 @@ void VideoCtl::ReadThread(VideoState *is)
         av_find_best_stream(ic, AVMEDIA_TYPE_VIDEO,
             st_index[AVMEDIA_TYPE_VIDEO], -1, NULL, 0);
 
+	// 视频流作为音频流的关联stream
     st_index[AVMEDIA_TYPE_AUDIO] =
         av_find_best_stream(ic, AVMEDIA_TYPE_AUDIO,
             st_index[AVMEDIA_TYPE_AUDIO],
             st_index[AVMEDIA_TYPE_VIDEO],
             NULL, 0);
 
+	// 如果有音频流，则音频流作为字幕流的关联stream；
+	// 否则视频流作为字幕流的关联stream
     st_index[AVMEDIA_TYPE_SUBTITLE] =
         av_find_best_stream(ic, AVMEDIA_TYPE_SUBTITLE,
             st_index[AVMEDIA_TYPE_SUBTITLE],
@@ -1444,7 +1449,8 @@ void VideoCtl::ReadThread(VideoState *is)
     for (;;) {
         if (is->abort_request)
             break;
-        if (is->paused != is->last_paused) {
+        if (is->paused != is->last_paused) 
+		{
             is->last_paused = is->paused;
             if (is->paused)
                 is->read_pause_return = av_read_pause(ic);
@@ -1453,7 +1459,8 @@ void VideoCtl::ReadThread(VideoState *is)
         }
 
         // 选取特定位置的数据（seek）
-        if (is->seek_req) {
+        if (is->seek_req) 
+		{
             int64_t seek_target = is->seek_pos;
             int64_t seek_min = is->seek_rel > 0 ? seek_target - is->seek_rel + 2 : INT64_MIN;
             int64_t seek_max = is->seek_rel < 0 ? seek_target - is->seek_rel - 2 : INT64_MAX;
@@ -1497,8 +1504,10 @@ void VideoCtl::ReadThread(VideoState *is)
                 step_to_next_frame(is);
         }
 
-        if (is->queue_attachments_req) {
-            if (is->video_st && is->video_st->disposition & AV_DISPOSITION_ATTACHED_PIC) {
+        if (is->queue_attachments_req) 
+		{
+            if (is->video_st && is->video_st->disposition & AV_DISPOSITION_ATTACHED_PIC) 
+			{
                 AVPacket copy;
                 if ((ret = av_copy_packet(&copy, &is->video_st->attached_pic)) < 0)
                     goto fail;
@@ -1513,7 +1522,8 @@ void VideoCtl::ReadThread(VideoState *is)
             (is->audioq.size + is->videoq.size + is->subtitleq.size > MAX_QUEUE_SIZE
                 || (stream_has_enough_packets(is->audio_st, is->audio_stream, &is->audioq) &&
                     stream_has_enough_packets(is->video_st, is->video_stream, &is->videoq) &&
-                    stream_has_enough_packets(is->subtitle_st, is->subtitle_stream, &is->subtitleq)))) {
+                    stream_has_enough_packets(is->subtitle_st, is->subtitle_stream, &is->subtitleq)))) 
+		{
             /* wait 10 ms */
             SDL_LockMutex(wait_mutex);
             SDL_CondWaitTimeout(is->continue_read_thread, wait_mutex, 10);
@@ -1523,7 +1533,8 @@ void VideoCtl::ReadThread(VideoState *is)
 
         if (!is->paused &&
             (!is->audio_st || (is->auddec.finished == is->audioq.serial && frame_queue_nb_remaining(&is->sampq) == 0)) &&
-            (!is->video_st || (is->viddec.finished == is->videoq.serial && frame_queue_nb_remaining(&is->pictq) == 0))) {
+            (!is->video_st || (is->viddec.finished == is->videoq.serial && frame_queue_nb_remaining(&is->pictq) == 0))) 
+		{
 
             //播放结束
             emit SigStop();
