@@ -462,11 +462,13 @@ static void decoder_init(Decoder *d, AVCodecContext *avctx, PacketQueue *queue, 
 
 static int decoder_reorder_pts = -1;
 
-//解码一帧数据
-static int decoder_decode_frame(Decoder *d, AVFrame *frame, AVSubtitle *sub) {
+//从PacketQueue中解码出一帧数据
+static int decoder_decode_frame(Decoder *d, AVFrame *frame, AVSubtitle *sub) 
+{
     int got_frame = 0;
 
-    do {
+    do 
+	{
         int ret = -1;
 
         if (d->queue->abort_request)
@@ -482,7 +484,8 @@ static int decoder_decode_frame(Decoder *d, AVFrame *frame, AVSubtitle *sub) {
                 //从对应的队列中获取原始数据
                 if (packet_queue_get(d->queue, &pkt, 1, &d->pkt_serial) < 0)
                     return -1;
-                if (pkt.data == flush_pkt.data) {
+                if (pkt.data == flush_pkt.data) 
+				{
                     avcodec_flush_buffers(d->avctx);
                     d->finished = 0;
                     d->next_pts = d->start_pts;
@@ -499,7 +502,8 @@ static int decoder_decode_frame(Decoder *d, AVFrame *frame, AVSubtitle *sub) {
         case AVMEDIA_TYPE_VIDEO:
             //解码视频帧
             ret = avcodec_decode_video2(d->avctx, frame, &got_frame, &d->pkt_temp);
-            if (got_frame) {
+            if (got_frame) 
+			{
                 if (decoder_reorder_pts == -1) {
                     frame->pts = av_frame_get_best_effort_timestamp(frame);
                 }

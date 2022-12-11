@@ -642,7 +642,8 @@ int VideoCtl::get_video_frame(VideoState *is, AVFrame *frame)
     if ((got_picture = decoder_decode_frame(&is->viddec, frame, NULL)) < 0)
         return -1;
 
-    if (got_picture) {
+    if (got_picture) 
+	{
 
         double dpts = NAN;
 
@@ -651,13 +652,16 @@ int VideoCtl::get_video_frame(VideoState *is, AVFrame *frame)
 
         frame->sample_aspect_ratio = av_guess_sample_aspect_ratio(is->ic, is->video_st, frame);
 
-        if (framedrop>0 || (framedrop && get_master_sync_type(is) != AV_SYNC_VIDEO_MASTER)) {
-            if (frame->pts != AV_NOPTS_VALUE) {
+        if (framedrop>0 || (framedrop && get_master_sync_type(is) != AV_SYNC_VIDEO_MASTER)) 
+		{
+            if (frame->pts != AV_NOPTS_VALUE) 
+			{
                 double diff = dpts - get_master_clock(is);
                 if (!std::isnan(diff) && fabs(diff) < AV_NOSYNC_THRESHOLD &&
                     diff - is->frame_last_filter_delay < 0 &&
                     is->viddec.pkt_serial == is->vidclk.serial &&
-                    is->videoq.nb_packets) {
+                    is->videoq.nb_packets) 
+				{
                     is->frame_drops_early++;
                     av_frame_unref(frame);
                     got_picture = 0;
@@ -726,7 +730,8 @@ int VideoCtl::video_thread(void *arg)
     }
 
     //循环从队列中获取视频帧
-    for (;;) {
+    for (;;) 
+	{
         ret = get_video_frame(is, frame);
         if (ret < 0)
             goto the_end;
@@ -1446,9 +1451,11 @@ void VideoCtl::ReadThread(VideoState *is)
         infinite_buffer = 1;
 
     //读取视频、音频和字幕数据
-    for (;;) {
+    for (;;) 
+	{
         if (is->abort_request)
             break;
+
         if (is->paused != is->last_paused) 
 		{
             is->last_paused = is->paused;
@@ -1568,14 +1575,15 @@ void VideoCtl::ReadThread(VideoState *is)
 		{
             is->eof = 0;
         }
+
         /* check if packet is in play range specified by user, then queue, otherwise discard */
         stream_start_time = ic->streams[pkt->stream_index]->start_time;
         pkt_ts = pkt->pts == AV_NOPTS_VALUE ? pkt->dts : pkt->pts;
         pkt_in_play_range = AV_NOPTS_VALUE == AV_NOPTS_VALUE ||
             (pkt_ts - (stream_start_time != AV_NOPTS_VALUE ? stream_start_time : 0)) *
             av_q2d(ic->streams[pkt->stream_index]->time_base) -
-            (double)(0) / 1000000
-            <= ((double)AV_NOPTS_VALUE / 1000000);
+            (double)(0) / 1000000 <= ((double)AV_NOPTS_VALUE / 1000000);
+
         //按数据帧的类型存放至对应队列
         if (pkt->stream_index == is->audio_stream && pkt_in_play_range) 
 		{
