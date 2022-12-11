@@ -136,7 +136,7 @@ typedef struct Frame {
     int width;
     int height;
     int format;
-    AVRational sar;
+    AVRational sar;	// Sample Aspect Ratio，采样纵横比/分辨率宽高比
     int uploaded;
     int flip_v;
 } Frame;
@@ -144,15 +144,15 @@ typedef struct Frame {
 //帧队列
 typedef struct FrameQueue {
     Frame queue[FRAME_QUEUE_SIZE];
-    int rindex;
-    int windex;
-    int size;
-    int max_size;
-    int keep_last;
-    int rindex_shown;
+    int rindex; // 读取下标
+    int windex; // 写入下标
+    int size;  // 已写入的节点数量
+    int max_size; // 最大节点个数
+    int keep_last; // 是否保留最后一个读取节点不被覆写
+    int rindex_shown; // 当前节点是否已经显示 
     SDL_mutex *mutex;
     SDL_cond *cond;
-    PacketQueue *pktq;
+    PacketQueue *pktq; // 关联的PacketQueue
 } FrameQueue;
 
 enum {
@@ -161,10 +161,11 @@ enum {
     AV_SYNC_EXTERNAL_CLOCK, /* synchronize to an external clock */
 };
 
-//解码器，管理数据队列
-typedef struct Decoder {
+//解码器管理数据队列，要解码的包也会放进来
+typedef struct Decoder 
+{
     AVPacket pkt;
-    AVPacket pkt_temp;
+    AVPacket pkt_temp; //实际解码的是pkt_temp
     PacketQueue *queue;
     AVCodecContext *avctx;
     int pkt_serial;  // 播放是否连续的标志
@@ -419,7 +420,8 @@ static int packet_queue_get(PacketQueue *q, AVPacket *pkt, int block, int *seria
         }
 
         pkt1 = q->first_pkt;
-        if (pkt1) {
+        if (pkt1) 
+		{
             q->first_pkt = pkt1->next;
             if (!q->first_pkt)
                 q->last_pkt = NULL;
@@ -492,7 +494,8 @@ static int decoder_decode_frame(Decoder *d, AVFrame *frame, AVSubtitle *sub)
                     d->next_pts_tb = d->start_pts_tb;
                 }
             } while (pkt.data == flush_pkt.data || d->queue->serial != d->pkt_serial);
-            av_packet_unref(&d->pkt);
+            // 抹掉解码器d中的旧pkt对象
+			av_packet_unref(&d->pkt);
             d->pkt_temp = d->pkt = pkt;
             d->packet_pending = 1;
         }
@@ -504,10 +507,12 @@ static int decoder_decode_frame(Decoder *d, AVFrame *frame, AVSubtitle *sub)
             ret = avcodec_decode_video2(d->avctx, frame, &got_frame, &d->pkt_temp);
             if (got_frame) 
 			{
-                if (decoder_reorder_pts == -1) {
+                if (decoder_reorder_pts == -1) 
+				{
                     frame->pts = av_frame_get_best_effort_timestamp(frame);
                 }
-                else if (!decoder_reorder_pts) {
+                else if (!decoder_reorder_pts) 
+				{
                     frame->pts = frame->pkt_dts;
                 }
             }
@@ -522,7 +527,8 @@ static int decoder_decode_frame(Decoder *d, AVFrame *frame, AVSubtitle *sub)
                     frame->pts = av_rescale_q(frame->pts, av_codec_get_pkt_timebase(d->avctx), tb);
                 else if (d->next_pts != AV_NOPTS_VALUE)
                     frame->pts = av_rescale_q(d->next_pts, d->next_pts_tb, tb);
-                if (frame->pts != AV_NOPTS_VALUE) {
+                if (frame->pts != AV_NOPTS_VALUE) 
+				{
                     d->next_pts = frame->pts + frame->nb_samples;
                     d->next_pts_tb = tb;
                 }
@@ -534,13 +540,16 @@ static int decoder_decode_frame(Decoder *d, AVFrame *frame, AVSubtitle *sub)
             break;
         }
 
-        if (ret < 0) {
+        if (ret < 0) 
+		{
             d->packet_pending = 0;
         }
-        else {
-            d->pkt_temp.dts =
-                d->pkt_temp.pts = AV_NOPTS_VALUE;
-            if (d->pkt_temp.data) {
+        else 
+		{
+            d->pkt_temp.dts = d->pkt_temp.pts = AV_NOPTS_VALUE;
+
+            if (d->pkt_temp.data) 
+			{
                 if (d->avctx->codec_type != AVMEDIA_TYPE_AUDIO)
                     ret = d->pkt_temp.size;
                 d->pkt_temp.data += ret;
@@ -632,7 +641,8 @@ static Frame *frame_queue_peek_writable(FrameQueue *f)
     /* wait until we have space to put a new frame */
     SDL_LockMutex(f->mutex);
     while (f->size >= f->max_size &&
-        !f->pktq->abort_request) {
+        !f->pktq->abort_request) 
+	{
         SDL_CondWait(f->cond, f->mutex);
     }
     SDL_UnlockMutex(f->mutex);
@@ -648,7 +658,8 @@ static Frame *frame_queue_peek_readable(FrameQueue *f)
     /* wait until we have a readable a new frame */
     SDL_LockMutex(f->mutex);
     while (f->size - f->rindex_shown <= 0 &&
-        !f->pktq->abort_request) {
+        !f->pktq->abort_request) 
+	{
         SDL_CondWait(f->cond, f->mutex);
     }
     SDL_UnlockMutex(f->mutex);
@@ -671,13 +682,15 @@ static void frame_queue_push(FrameQueue *f)
 
 static void frame_queue_next(FrameQueue *f)
 {
-    if (f->keep_last && !f->rindex_shown) {
+    if (f->keep_last && !f->rindex_shown) 
+	{
         f->rindex_shown = 1;
         return;
     }
     frame_queue_unref_item(&f->queue[f->rindex]);
     if (++f->rindex == f->max_size)
         f->rindex = 0;
+
     SDL_LockMutex(f->mutex);
     f->size--;
     SDL_CondSignal(f->cond);

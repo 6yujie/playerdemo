@@ -650,6 +650,7 @@ int VideoCtl::get_video_frame(VideoState *is, AVFrame *frame)
         if (frame->pts != AV_NOPTS_VALUE)
             dpts = av_q2d(is->video_st->time_base) * frame->pts;
 
+		// 采样纵横比，横向像素点数与纵向像素点数的比值，也就是分辨率宽高比
         frame->sample_aspect_ratio = av_guess_sample_aspect_ratio(is->ic, is->video_st, frame);
 
         if (framedrop>0 || (framedrop && get_master_sync_type(is) != AV_SYNC_VIDEO_MASTER)) 
@@ -722,6 +723,7 @@ int VideoCtl::video_thread(void *arg)
     double duration;
     int ret;
     AVRational tb = is->video_st->time_base;
+	// 帧率，例如24/1等
     AVRational frame_rate = av_guess_frame_rate(is->ic, is->video_st, NULL);
 
     if (!frame) 
@@ -1637,25 +1639,28 @@ VideoState* VideoCtl::stream_open(const char *filename)
     is->xleft = 0;
 
     /* start video display */
-    //初始化视频帧队列
+    //初始化解码视频帧队列
     if (frame_queue_init(&is->pictq, &is->videoq, VIDEO_PICTURE_QUEUE_SIZE, 1) < 0)
         goto fail;
-    //初始化字幕帧队列
+    //初始化解码字幕帧队列
     if (frame_queue_init(&is->subpq, &is->subtitleq, SUBPICTURE_QUEUE_SIZE, 0) < 0)
         goto fail;
-    //初始化音频帧队列
+    //初始化解码音频帧队列
     if (frame_queue_init(&is->sampq, &is->audioq, SAMPLE_QUEUE_SIZE, 1) < 0)
         goto fail;
-    //初始化队列中的数据包
+    //初始化原始数据包队列
     if (packet_queue_init(&is->videoq) < 0 ||
         packet_queue_init(&is->audioq) < 0 ||
         packet_queue_init(&is->subtitleq) < 0)
         goto fail;
+
     //构建 继续读取线程 信号量
-    if (!(is->continue_read_thread = SDL_CreateCond())) {
+    if (!(is->continue_read_thread = SDL_CreateCond())) 
+	{
         av_log(NULL, AV_LOG_FATAL, "SDL_CreateCond(): %s\n", SDL_GetError());
         goto fail;
     }
+
     //视频、音频 时钟
     init_clock(&is->vidclk, &is->videoq.serial);
     init_clock(&is->audclk, &is->audioq.serial);
