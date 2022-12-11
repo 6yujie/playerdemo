@@ -8,6 +8,8 @@
 *.sln.docstates
 
 ui_*.h
+*.sln
+*.vcxproj*
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
