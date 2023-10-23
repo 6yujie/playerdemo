@@ -1299,6 +1299,7 @@ int VideoCtl::is_realtime(AVFormatContext *s)
 
 /* this thread gets the stream from the disk or the network */
 //读取线程
+extern bool g_saveFrame;
 void VideoCtl::ReadThread(VideoState *is)
 {
     //VideoState *is = (VideoState *)arg;
@@ -1467,6 +1468,58 @@ void VideoCtl::ReadThread(VideoState *is)
                 av_read_play(ic);
         }
 
+		if (g_saveFrame)
+		{
+			g_saveFrame = false;
+#if 1
+// 			auto currentTime = get_master_clock(is);
+			auto currentTime = is->audclk.pts;
+			qDebug() << "current time is: " << currentTime << "s";
+// 			qDebug() << "current pts is: " << is->vidclk.pts;
+			
+// 			AVPacket *tmp = av_packet_alloc();
+
+			int64_t targetTime = 100 * AV_TIME_BASE;
+#if 0
+			av_seek_frame(is->ic, is->video_stream, targetTime, AVSEEK_FLAG_BACKWARD);
+#else
+// 			int ret = avformat_seek_file(is->ic, is->video_stream, INT64_MIN, 200000, INT64_MAX, 0);
+			int ret = avformat_seek_file(is->ic, -1, INT64_MIN, targetTime, INT64_MAX, AVSEEK_FLAG_ANY);
+			qDebug() << "seek ret: " << ret;
+#endif
+// 			while (av_read_frame(is->ic, tmp) >= 0)
+// 			{
+// 				if (tmp->stream_index == is->video_stream)
+// 				{
+// 					// TODO decode AVPacket to AVFrame
+// 					qDebug() << "pts of read packet: " << tmp->pts;
+// 					break;
+// 				}
+// 			}
+
+// 			qDebug()<<"time after seek to "<< targetTime << " is: " << get_master_clock(is) <<"s";
+
+			targetTime = int64_t(currentTime * AV_TIME_BASE);
+
+// 			ret = avformat_seek_file(is->ic, -1, INT64_MIN, targetTime, INT64_MAX, AVSEEK_FLAG_ANY);
+// 			qDebug() << "jump back to: " << currentTime << "us. ret = " << ret<<"\n";
+#if 1
+			// flush后才会立即刷新画面和声音
+			packet_queue_flush(&is->videoq);
+			packet_queue_put(&is->videoq, &flush_pkt);
+			packet_queue_flush(&is->audioq);
+			packet_queue_put(&is->audioq, &flush_pkt);
+
+			set_clock(&is->extclk, targetTime / (double)AV_TIME_BASE, 0);
+#endif
+// 			set_clock(&is->extclk, targetTime / (double)AV_TIME_BASE, 0);
+// 			qDebug() << "time after seek back to " << targetTime << " is: " << get_master_clock(is) << "s\n";
+
+// 			av_packet_unref(tmp);
+// 			av_packet_free(&tmp);
+#endif
+		}
+
         // 选取特定位置的数据（seek）
         if (is->seek_req) 
 		{
@@ -1554,6 +1607,9 @@ void VideoCtl::ReadThread(VideoState *is)
 		// 视频每次读取一帧
 		// 帧尺寸固定的音频每次读取到整数帧，不定长帧尺寸的音频每次读取一帧
         ret = av_read_frame(ic, pkt);
+#if 0
+		qDebug() << "packet pts: " << pkt->pts << ", master time: " << get_master_clock(is) <<", audclk pts: " << is->audclk.pts;
+#endif
         if (ret < 0) // 出错或文件结束
 		{
             if ((ret == AVERROR_EOF || avio_feof(ic->pb)) && !is->eof) 

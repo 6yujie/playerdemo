@@ -21,6 +21,7 @@
 #pragma execution_character_set("utf-8")
 
 QMutex g_show_rect_mutex;
+bool g_saveFrame = false;
 
 Show::Show(QWidget *parent) :
     QWidget(parent),
@@ -54,7 +55,9 @@ Show::Show(QWidget *parent) :
 
     m_stMenu.addActions(m_stActionGroup.actions());
 
-    
+	saveFrameTimer.setInterval(3000);
+// 	saveFrameTimer.setSingleShot(true);
+	connect(&saveFrameTimer, &QTimer::timeout, [] {g_saveFrame = true; });
 }
 
 Show::~Show()
@@ -191,11 +194,14 @@ void Show::OnDisplayMsg(QString strMsg)
 void Show::OnPlay(QString strFile)
 {
     VideoCtl::GetInstance()->StartPlay(strFile, ui->label->winId());
+
+	saveFrameTimer.start();
 }
 
 void Show::OnStopFinished()
 {
     update();
+	saveFrameTimer.stop();
 }
 
 

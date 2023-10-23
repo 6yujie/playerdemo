@@ -203,6 +203,7 @@ typedef struct VideoState {
     FrameQueue pictq; // 视频帧队列
     FrameQueue subpq; // 字幕帧队列
     FrameQueue sampq; // 音频帧队列
+	FrameQueue previewq; // 预览帧队列
 
     Decoder auddec;
     Decoder viddec;
