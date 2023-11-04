@@ -100,8 +100,10 @@ private:
     int stream_has_enough_packets(AVStream *st, int stream_id, PacketQueue *queue);
     int is_realtime(AVFormatContext *s);
     void ReadThread(VideoState *CurStream);
+	void PreviewReadThread(VideoState *CurStream);
     void LoopThread(VideoState *CurStream);
     VideoState *stream_open(const char *filename);
+	VideoState *preview_stream_open(const char *filename);
 
     void stream_cycle_channel(VideoState *is, int codec_type);
     void refresh_loop_wait_event(VideoState *is, SDL_Event *event);
@@ -148,6 +150,7 @@ private:
     bool m_bPlayLoop; //刷新循环标志
 
     VideoState* m_CurStream;
+	VideoState *m_previewStream;
 
     SDL_Window *window;
     SDL_Renderer *renderer;

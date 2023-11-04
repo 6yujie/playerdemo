@@ -149,7 +149,7 @@ typedef struct FrameQueue {
     int size;  // 已写入的节点数量
     int max_size; // 最大节点个数
     int keep_last; // 是否保留最后一个读取节点不被覆写
-    int rindex_shown; // 当前节点是否已经显示 
+    int rindex_shown; // 当前是否有帧在显示 
     SDL_mutex *mutex;
     SDL_cond *cond;
     PacketQueue *pktq; // 关联的PacketQueue

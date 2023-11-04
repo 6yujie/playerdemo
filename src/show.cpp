@@ -55,7 +55,7 @@ Show::Show(QWidget *parent) :
 
     m_stMenu.addActions(m_stActionGroup.actions());
 
-	saveFrameTimer.setInterval(3000);
+	saveFrameTimer.setInterval(1000);
 // 	saveFrameTimer.setSingleShot(true);
 	connect(&saveFrameTimer, &QTimer::timeout, [] {g_saveFrame = true; });
 }
@@ -195,13 +195,17 @@ void Show::OnPlay(QString strFile)
 {
     VideoCtl::GetInstance()->StartPlay(strFile, ui->label->winId());
 
+#if 1
 	saveFrameTimer.start();
+#endif
 }
 
 void Show::OnStopFinished()
 {
     update();
+#if 1
 	saveFrameTimer.stop();
+#endif
 }
 
 
