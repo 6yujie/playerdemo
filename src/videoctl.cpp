@@ -12,6 +12,7 @@
 
 #include <QDebug>
 #include <QMutex>
+#include <QElapsedTimer>
 
 #include <thread>
 #include "videoctl.h"
@@ -1629,6 +1630,7 @@ fail:
 }
 
 extern bool g_saveFrame;
+extern int g_seekTime;
 void VideoCtl::PreviewReadThread(VideoState *is)
 {
 	AVFormatContext *ic = NULL; //文件格式信息
@@ -1706,11 +1708,6 @@ void VideoCtl::PreviewReadThread(VideoState *is)
 	is->max_frame_duration = (ic->iformat->flags & AVFMT_TS_DISCONT) ? 10.0 : 3600.0;
 
 	is->realtime = is_realtime(ic);
-
-
-#if 0
-	emit SigVideoTotalSeconds(ic->duration / 1000000LL);
-#endif
 
 	// wanted_stream_spec没有改变过值，下面的两个for循环语句都不会有效执行
 	for (i = 0; i < ic->nb_streams; i++)
@@ -1791,10 +1788,12 @@ void VideoCtl::PreviewReadThread(VideoState *is)
 	if (infinite_buffer < 0 && is->realtime)
 		infinite_buffer = 1;
 
-// 	AVPacket *tmp = av_packet_alloc();
 	AVPacket *tmp = pkt;
 	AVFrame *frame = av_frame_alloc();
 	AVFrame *frameRGB = av_frame_alloc();
+// 	QImage *previewImg = nullptr;
+	QElapsedTimer *debunceTimer = new QElapsedTimer();
+	debunceTimer->start();
 
 	//读取视频、音频和字幕数据
 	for (;;)
@@ -1802,26 +1801,28 @@ void VideoCtl::PreviewReadThread(VideoState *is)
 		if (is->abort_request)
 			break;
 
-#if 0
-		if (is->paused != is->last_paused)
-		{
-			is->last_paused = is->paused;
-			if (is->paused)
-				is->read_pause_return = av_read_pause(ic);
-			else
-				av_read_play(ic);
-		}
-#endif
+		static int64_t s_last_pts = 0;
+		static int s_last_target = 0;
 
 		if (g_saveFrame)
 		{
-			g_saveFrame = false;
-
+			if (debunceTimer->elapsed() < 100)
+			{
+				continue;
+			}
 #if 1
-
 			int got_frame = 0;
 
-			int64_t targetTime = 100 * AV_TIME_BASE;
+			if (s_last_target == g_seekTime)
+			{
+				continue;
+			}
+			else
+			{
+				s_last_target = g_seekTime;
+			}
+
+			int64_t targetTime = g_seekTime * AV_TIME_BASE;
 
 			int ret = avformat_seek_file(is->ic, -1, INT64_MIN, targetTime, INT64_MAX, AVSEEK_FLAG_BACKWARD);
 			if (ret < 0)
@@ -1831,17 +1832,25 @@ void VideoCtl::PreviewReadThread(VideoState *is)
 
 			while (av_read_frame(ic, tmp) >= 0)
 			{
-				qDebug() << "pts of read packet: " << tmp->pts;
+				if(tmp->pts == s_last_pts)
+				{
+					qDebug() << "Key frame not changed";
+					emit SigPreviewFrame();
+					continue;
+				}
+				else
+				{
+					s_last_pts = tmp->pts;
+				}
 
 #if 1
 				if (tmp->stream_index == is->video_stream)
 			 	{
-					// TODO decode AVPacket to AVFrame
 					auto avctx = is->viddec.avctx;
 					do 
 					{
 						ret = avcodec_decode_video2(avctx, frame, &got_frame, tmp);
-						qDebug() << "got_frame: " << got_frame << ", ret: " << ret;
+// 						qDebug() << "got_frame: " << got_frame << ", ret: " << ret;
 						if (got_frame == 0)
 						{
 							av_frame_unref(frame);
@@ -1861,10 +1870,14 @@ void VideoCtl::PreviewReadThread(VideoState *is)
 
 						sws_scale(img_convert_ctx, frame->data, frame->linesize, 0, avctx->height, 
 							frameRGB->data, frameRGB->linesize);
-
+						
+						// img will be deleted by ctrlbar
 						QImage img(frameRGB->data[0], avctx->width, avctx->height, frameRGB->linesize[0], QImage::Format_RGB888);
-
-						img.save("preview.jpg");
+						if (!img.save("preview.jpg"))
+						{
+							qDebug() << "save preview.jpg failed";
+						}
+						emit SigPreviewFrame();
 
 						avpicture_free((AVPicture*)frameRGB);
 						av_frame_unref(frameRGB);
@@ -1880,6 +1893,8 @@ void VideoCtl::PreviewReadThread(VideoState *is)
 				av_packet_unref(tmp);
 				av_frame_unref(frame);
 			}
+
+			debunceTimer->restart();
 #endif
 		}
 	}

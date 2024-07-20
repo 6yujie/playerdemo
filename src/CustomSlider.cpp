@@ -32,9 +32,27 @@ void CustomSlider::mouseReleaseEvent(QMouseEvent *ev)
 void CustomSlider::mouseMoveEvent(QMouseEvent *ev)
 {
     QSlider::mouseMoveEvent(ev);
-    //获取鼠标的位置，这里并不能直接从ev中取值（因为如果是拖动的话，鼠标开始点击的位置没有意义了）
-    double pos = ev->pos().x() / (double)width();
-    setValue(pos * (maximum() - minimum()) + minimum());
+	double pos = ev->pos().x() / (double)width();
 
-    emit SigCustomSliderValueChanged();
+    //获取鼠标的位置，这里并不能直接从ev中取值（因为如果是拖动的话，鼠标开始点击的位置没有意义了）
+	if (ev->buttons() == Qt::LeftButton)
+	{
+		setValue(pos * (maximum() - minimum()) + minimum());
+
+		emit SigCustomSliderValueChanged();
+	}
+	else if (ev->buttons() == Qt::NoButton)
+	{
+		emit SigCustomSliderHoverMove(pos);
+	}
+}
+
+void CustomSlider::enterEvent(QEvent *ev)
+{
+	emit SigCustomSliderHoverEnter();
+}
+
+void CustomSlider::leaveEvent(QEvent *ev)
+{
+	emit SigCustomSliderHoverLeave();
 }

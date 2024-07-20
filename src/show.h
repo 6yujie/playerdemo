@@ -134,7 +134,6 @@ private:
     int m_nLastFrameHeight;
 
     QTimer timerShowCursor;
-	QTimer saveFrameTimer;
 
     QMenu m_stMenu;
     QActionGroup m_stActionGroup;

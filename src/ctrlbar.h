@@ -12,12 +12,14 @@
 #define CTRLBAR_H
 
 #include <QWidget>
+#include <QImage>
 #include "CustomSlider.h"
 
 namespace Ui {
 class CtrlBar;
 }
 
+class QLabel;
 class CtrlBar : public QWidget
 {
     Q_OBJECT
@@ -41,7 +43,9 @@ public:
     void OnStopFinished();
 private:
     void OnPlaySliderValueChanged();
+	void OnPlaySliderHoverMoved(double value);
     void OnVolumeSliderValueChanged();
+	void OnPreviewImage();
 private slots:
     void on_PlayOrPauseBtn_clicked();
     void on_VolumeBtn_clicked();
@@ -69,6 +73,8 @@ signals:
 private:
     Ui::CtrlBar *ui;
 
+	QLabel *m_previewImgLabel;
+	QImage *m_lastPreviewImg;
     int m_nTotalPlaySeconds;
     double m_dLastVolumePercent;
 };

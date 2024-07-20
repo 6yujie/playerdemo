@@ -18,8 +18,6 @@
 #include "globalhelper.h"
 #include "datactl.h"
 
-
-
 //单例模式
 class VideoCtl : public QObject
 {
@@ -60,6 +58,8 @@ signals:
     void SigStopFinished();//停止播放完成
 
     void SigStartPlay(QString strFileName);
+
+	void SigPreviewFrame();
 public:
     void OnPlaySeek(double dPercent);
     void OnPlayVolume(double dPercent);
